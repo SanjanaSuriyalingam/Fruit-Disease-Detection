@@ -1,0 +1,21 @@
+const int relayPin = 13; 
+
+void setup() {
+  pinMode(relayPin, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    char command = Serial.read();
+    
+    if (command == 'A') {
+      // Turn on the relay
+      digitalWrite(relayPin, HIGH);
+      Serial.println("Relay turned ON");
+    } else if (command == 'B') {
+      digitalWrite(relayPin, LOW);
+      Serial.println("Relay turned OFF");
+    }
+  }
+}

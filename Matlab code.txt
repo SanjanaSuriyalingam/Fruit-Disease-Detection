@@ -1,0 +1,72 @@
+s = serialport("COM9", 9600);
+
+healthyFolder = 'my_images/healthy';
+diseasedFolder = 'my_images/diseased';
+
+healthyDir = dir(fullfile(healthyFolder, '*.jpg'));
+diseasedDir = dir(fullfile(diseasedFolder, '*.jpg'));
+healthyImages = [];
+diseasedImages = [];
+
+for i = 1:length(healthyDir)
+    img = imread(fullfile(healthyFolder, healthyDir(i).name));
+    img = imresize(img, [256 256]);
+    healthyImages{i} = img;
+end
+
+for i = 1:length(diseasedDir)
+    img = imread(fullfile(diseasedFolder, diseasedDir(i).name));
+    img = imresize(img, [256 256]);
+    diseasedImages{i} = img;
+end
+
+cam = webcam(1);
+frame = snapshot(cam);
+clear cam;
+
+grayImage = im2gray(frame);
+enhancedImage = imadjust(grayImage);
+filteredImage = medfilt2(enhancedImage, [3 3]);
+threshold = graythresh(filteredImage);
+bwImage = im2bw(filteredImage, threshold);
+
+redChannel = frame(:,:,1);
+greenChannel = frame(:,:,2);
+blueChannel = frame(:,:,3);
+colorFeatures = [mean(redChannel(:)), mean(greenChannel(:)), mean(blueChannel(:))];
+GLCM = graycomatrix(filteredImage);
+stats = graycoprops(GLCM);
+textureFeatures = [stats.Contrast, stats.Correlation, stats.Energy, stats.Homogeneity];
+
+healthyDistances = [];
+diseasedDistances = [];
+
+for i = 1:length(healthyImages)
+    healthyFeatures = extractFeatures(healthyImages{i});
+    distance = pdist2([colorFeatures, textureFeatures], healthyFeatures);
+    healthyDistances(i) = distance;
+end
+
+for i = 1:length(diseasedImages)
+    diseasedFeatures = extractFeatures(diseasedImages{i});
+    distance = pdist2([colorFeatures, textureFeatures], diseasedFeatures);
+    diseasedDistances(i) = distance;
+end
+
+tolerance = 0.5;
+healthyThreshold = mean(healthyDistances) + std(healthyDistances) * tolerance;
+diseasedThreshold = mean(diseasedDistances) - std(diseasedDistances) * tolerance;
+
+if (any(min(healthyDistances) < healthyThreshold) && all(min(diseasedDistances) > diseasedThreshold))
+    diseaseDetected = false;
+else
+    diseaseDetected = true;
+end
+
+if (diseaseDetected)
+    write(s, 'A','char');
+else
+    write(s,'B','char');
+end
+
+clear s;
